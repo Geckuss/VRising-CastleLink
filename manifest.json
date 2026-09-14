@@ -1,0 +1,10 @@
+{
+  "name": "CastleLink",
+  "version_number": "1.0.0",
+  "website_url": "https://github.com/YourName/CastleLink",
+  "description": "Share resources across all castles a player owns: right-click a recipe to pull materials from your other castles, plus gather/deposit commands.",
+  "dependencies": [
+    "BepInEx-BepInExPack_V_Rising-1.733.2",
+    "deca-VampireCommandFramework-0.11.0"
+  ]
+}
