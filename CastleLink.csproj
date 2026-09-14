@@ -3,7 +3,7 @@
     <TargetFramework>net6.0</TargetFramework>
     <AssemblyName>CastleLink</AssemblyName>
     <Product>CastleLink</Product>
-    <Authors>YourName</Authors>
+    <Authors>Geckuss</Authors>
     <Description>Share resources across all the castles a player owns: right-click a station recipe to pull its materials from your other castles, and use chat commands to gather/deposit resources between castles.</Description>
     <Version>1.0.0</Version>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
