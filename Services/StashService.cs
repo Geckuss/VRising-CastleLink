@@ -17,6 +17,13 @@ internal static class StashService
     private static ServerGameManager SGM => Core.ServerGameManager;
 
     /// <summary>
+    /// The number of inventory slots reserved for the player's hotbar (action bar).
+    /// In V Rising these are the first slots of the player's inventory buffer; items
+    /// placed there must never be deposited by CastleLink.
+    /// </summary>
+    public const int ActionBarSlots = 8;
+
+    /// <summary>
     /// All container ("stash") entities in the castle owned by <paramref name="heart"/>.
     /// These are the InventorySource entities from the heart's SharedCastleInventories.
     /// </summary>
@@ -190,6 +197,56 @@ internal static class StashService
             int take = have < want ? have : want;
             if (SGM.TryRemoveInventoryItem(stash, item, take))
                 removed += take;
+        }
+        return removed;
+    }
+
+    /// <summary>
+    /// Count how much of <paramref name="item"/> the player is carrying, excluding
+    /// hotbar (action bar) slots. Hotbar items belong to the player and must never
+    /// be treated as deposit fodder.
+    /// </summary>
+    public static int CountItemInInventoryExcludingHotbar(Entity inventory, PrefabGUID item)
+    {
+        int count = 0;
+        if (!EM.HasBuffer<InventoryBuffer>(inventory)) return 0;
+        var buf = EM.GetBuffer<InventoryBuffer>(inventory);
+        for (int i = ActionBarSlots; i < buf.Length; i++)
+        {
+            var slot = buf[i];
+            if (slot.ItemType == item && slot.Amount > 0) count += slot.Amount;
+        }
+        return count;
+    }
+
+    /// <summary>
+    /// Remove up to <paramref name="amount"/> of <paramref name="item"/> from the
+    /// player's inventory, touching only non-hotbar slots. Returns how many were
+    /// actually removed.
+    /// </summary>
+    public static int RemoveItemFromInventoryExcludingHotbar(Entity inventory, PrefabGUID item, int amount)
+    {
+        int removed = 0;
+        if (amount <= 0) return 0;
+        if (!EM.HasBuffer<InventoryBuffer>(inventory)) return 0;
+        var buf = EM.GetBuffer<InventoryBuffer>(inventory);
+        for (int i = ActionBarSlots; i < buf.Length; i++)
+        {
+            if (removed >= amount) break;
+            var slot = buf[i];
+            if (slot.ItemType != item || slot.Amount <= 0) continue;
+            int take = slot.Amount < amount - removed ? slot.Amount : amount - removed;
+            removed += take;
+            int remaining = slot.Amount - take;
+            if (remaining <= 0)
+            {
+                InventoryUtilitiesServer.ClearSlot(EM, inventory, i);
+            }
+            else
+            {
+                slot.Amount = remaining;
+                buf[i] = slot;
+            }
         }
         return removed;
     }

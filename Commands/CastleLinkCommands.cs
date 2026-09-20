@@ -21,8 +21,8 @@ internal static class CastleLinkCommands
         ctx.Reply(".wolt (.all) \u2014 top up THIS castle's storage boxes to one stack of each storable item, from your other castles.");
         ctx.Reply(".pull \u2014 top up items you already carry to one full stack (storable items only).");
         ctx.Reply(".pull <guid> <amount> \u2014 pull a specific item by PrefabGUID hash.");
-        ctx.Reply(".pullcat (.pc) <category> \u2014 pull all items of a category (other castles first, then current).");
-        ctx.Reply(".deposit (.dep) \u2014 deposit inventory into this castle's dedicated boxes (leaves armor/weapons).");
+        ctx.Reply(".pullcat (.pc) <category> \u2014 pull one stack of each item in a category (topping up; other castles first, then current).");
+        ctx.Reply(".deposit (.dep) \u2014 deposit inventory into this castle's dedicated boxes (skips your hotbar; leaves armor/weapons).");
         ctx.Reply("Categories: " + string.Join(", ", CategoryGroups.Keys));
         ctx.Reply("Crafting: right-click a recipe at a station to pull its materials from your other castles.");
     }
@@ -109,7 +109,7 @@ internal static class CastleLinkCommands
         ["everything"]  = ItemCategory.ALL,
     };
 
-    [Command("pullcat", "pc", description: "Pull all items of a category from your other castles into your inventory. Categories: armor, weapons, gear, herbs, materials, jewels, consumables, fish, silver.", adminOnly: false)]
+    [Command("pullcat", "pc", description: "Pull one stack of each item of a category from your other castles into your inventory (topping up to one full stack). Categories: armor, weapons, gear, herbs, materials, jewels, consumables, fish, silver.", adminOnly: false)]
     public static void PullCategory(ChatCommandContext ctx, string category)
     {
         if (!CategoryGroups.TryGetValue(category, out var mask))
@@ -142,10 +142,17 @@ internal static class CastleLinkCommands
 
         int totalPulled = 0;
         foreach (var kv in available)
-            totalPulled += PullItem(sources, inv, kv.Value, int.MaxValue);
+        {
+            var item = kv.Value;
+            int have = SGM.GetInventoryItemCount(inv, item);
+            int maxStack = StashService.GetMaxStack(item);
+            int wanted = maxStack - have;
+            if (wanted <= 0) continue;                     // already have a full stack
+            totalPulled += PullItem(sources, inv, item, wanted);
+        }
 
         ctx.Reply(totalPulled > 0
-            ? $"Pulled {totalPulled} {category} items into your inventory."
+            ? $"Pulled {totalPulled} {category} items into your inventory (one stack each)."
             : $"Nothing to pull for '{category}' (none found, or inventory full).");
     }
 
@@ -163,7 +170,7 @@ internal static class CastleLinkCommands
         ctx.Reply(pulled > 0 ? $"Pulled {pulled}x item {prefabGuid}." : "Nothing pulled (not found in other castles, or inventory full).");
     }
 
-    [Command("deposit", "dep", description: "Deposit inventory items into this castle's dedicated storage boxes (materials/herbs/etc.; leaves armor/weapons).", adminOnly: false)]
+    [Command("deposit", "dep", description: "Deposit inventory items into this castle's dedicated storage boxes (materials/herbs/etc.; skips your hotbar, leaves armor/weapons).", adminOnly: false)]
     public static void Deposit(ChatCommandContext ctx)
     {
         var character = ctx.Event.SenderCharacterEntity;
@@ -173,10 +180,11 @@ internal static class CastleLinkCommands
         if (!InventoryUtilities.TryGetInventoryEntity(EM, character, out var inv) || !EM.Exists(inv))
         { ctx.Reply("Could not access your inventory."); return; }
 
-        // Snapshot the distinct items currently in the player's inventory.
+        // Snapshot the distinct items in the player's inventory, skipping the
+        // hotbar (action bar) slots — those must stay on the player.
         var items = new Dictionary<int, PrefabGUID>();
         var buffer = EM.GetBuffer<InventoryBuffer>(inv);
-        for (int i = 0; i < buffer.Length; i++)
+        for (int i = StashService.ActionBarSlots; i < buffer.Length; i++)
         {
             var slot = buffer[i];
             if (slot.ItemType.GuidHash == 0) continue;
@@ -187,15 +195,14 @@ internal static class CastleLinkCommands
         foreach (var kv in items)
         {
             var item = kv.Value;
-            int have = SGM.GetInventoryItemCount(inv, item);
+            int have = StashService.CountItemInInventoryExcludingHotbar(inv, item);
             if (have <= 0) continue;
 
             int deposited = StashService.DepositIntoRestrictedBox(heart, item, have);
             if (deposited <= 0) continue;
 
-            // Remove what we deposited from the player's inventory.
-            SGM.TryRemoveInventoryItem(inv, item, deposited);
-            totalDeposited += deposited;
+            // Remove what we deposited from the player's inventory, leaving the hotbar alone.
+            totalDeposited += StashService.RemoveItemFromInventoryExcludingHotbar(inv, item, deposited);
         }
 
         ctx.Reply(totalDeposited > 0

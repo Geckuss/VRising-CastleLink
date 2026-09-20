@@ -38,8 +38,8 @@ prefix (default `.`).
 | `.wolt` | `.all` | Top up **this castle's** storage boxes to one full stack of each storable item, pulled from your other castles. |
 | `.pull` | | Top up items you already carry to one full stack (storable items only). |
 | `.pull <guid> <amount>` | | Pull a specific item by PrefabGUID hash. |
-| `.pullcat <category>` | `.pc <category>` | Pull all items of a category into your inventory (other castles first, then the current one). |
-| `.deposit` | `.dep` | Deposit your inventory's items into this castle's dedicated storage boxes (leaves armor/weapons). |
+| `.pullcat <category>` | `.pc <category>` | Pull one stack of each item in a category into your inventory (topping up to a full stack; other castles first, then the current one). |
+| `.deposit` | `.dep` | Deposit your inventory's items into this castle's dedicated storage boxes (skips your hotbar; leaves armor/weapons). |
 
 ### Categories
 
